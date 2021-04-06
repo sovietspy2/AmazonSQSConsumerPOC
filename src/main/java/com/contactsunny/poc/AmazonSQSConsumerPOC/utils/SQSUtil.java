@@ -8,8 +8,10 @@ import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
+import com.amazonaws.services.sqs.model.SendMessageRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,9 @@ public class SQSUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(SQSUtil.class);
 
+    @Autowired
+    private MessageFactory messageFactory;
+
     @PostConstruct
     private void postConstructor() {
 
@@ -44,16 +49,24 @@ public class SQSUtil {
                 new BasicAWSCredentials(awsAccessKey, awsSecretKey)
         );
 
-        this.amazonSQS = AmazonSQSClientBuilder.standard().withCredentials(awsCredentialsProvider).build();
+        this.amazonSQS = AmazonSQSClientBuilder.standard().withCredentials(awsCredentialsProvider).withRegion(awsRegion).build();
     }
 
-    public void startListeningToMessages() {
+    public void send(String message) {
+
+        amazonSQS.sendMessage(messageFactory.build().withMessageBody(message));
+
+    }
+
+    public void get() {
+
+        logger.info("soon to get messages");
 
         final ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(sqsUrl)
-                .withMaxNumberOfMessages(1)
-                .withWaitTimeSeconds(3);
+                .withMaxNumberOfMessages(5)
+                .withWaitTimeSeconds(10);
 
-        while (true) {
+        logger.info(" fetching messages");
 
             final List<Message> messages = amazonSQS.receiveMessage(receiveMessageRequest).getMessages();
 
@@ -64,7 +77,8 @@ public class SQSUtil {
 
                 deleteMessage(messageObject);
             }
-        }
+
+        logger.info(" done fetching messages");
     }
 
     private void deleteMessage(Message messageObject) {
